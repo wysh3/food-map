@@ -149,19 +149,19 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     SELECT id, name, cuisine, rating, lat, lon, city, geom
                     FROM restaurants
                     WHERE is_active = true
-                      AND ST_Intersects(restaurants.geom, (SELECT tile_bounds.geom FROM tile_bounds))
+                      AND ST_Intersects(geom, (SELECT geom FROM tile_bounds))
                 ),
                 clustered AS (
                     SELECT 
-                        ST_ClusterDBSCAN(restaurants_in_tile.geom, eps := 0.01, minpoints := 3) OVER () AS cluster_id,
-                        restaurants_in_tile.id, 
-                        restaurants_in_tile.name, 
-                        restaurants_in_tile.cuisine, 
-                        restaurants_in_tile.rating, 
-                        restaurants_in_tile.lat, 
-                        restaurants_in_tile.lon, 
-                        restaurants_in_tile.city, 
-                        restaurants_in_tile.geom
+                        ST_ClusterDBSCAN(geom, eps := 0.01, minpoints := 3) OVER () AS cluster_id,
+                        id, 
+                        name, 
+                        cuisine, 
+                        rating, 
+                        lat, 
+                        lon, 
+                        city, 
+                        geom
                     FROM restaurants_in_tile
                 )
                 SELECT 
@@ -172,10 +172,10 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     CASE WHEN cluster_id IS NOT NULL THEN AVG(rating) ELSE rating END AS rating,
                     CASE WHEN cluster_id IS NOT NULL THEN NULL ELSE city END AS city,
                     CASE WHEN cluster_id IS NOT NULL THEN COUNT(*) ELSE NULL END AS count,
-                    CASE WHEN cluster_id IS NOT NULL THEN ST_Y(ST_Centroid(ST_Collect(clustered.geom))) ELSE lat END AS lat,
-                    CASE WHEN cluster_id IS NOT NULL THEN ST_X(ST_Centroid(ST_Collect(clustered.geom))) ELSE lon END AS lon
+                    CASE WHEN cluster_id IS NOT NULL THEN ST_Y(ST_Centroid(ST_Collect(geom))) ELSE lat END AS lat,
+                    CASE WHEN cluster_id IS NOT NULL THEN ST_X(ST_Centroid(ST_Collect(geom))) ELSE lon END AS lon
                 FROM clustered
-                GROUP BY cluster_id, id, name, cuisine, rating, lat, lon, city, clustered.geom
+                GROUP BY cluster_id, id, name, cuisine, rating, lat, lon, city, geom
                 LIMIT 5000;
             `;
         } else {
@@ -442,7 +442,7 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
                 NULL::integer AS count,
                 lat, lon
             FROM restaurants, tile_bounds
-            WHERE ST_Intersects(geom, tile_bounds.geom)
+            WHERE ST_Intersects(restaurants.geom, tile_bounds.geom)
             LIMIT 10;
         `;
         

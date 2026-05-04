@@ -385,7 +385,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Setup endpoint - loads sample data (call this once after deployment)
-app.post('/api/setup', async (req, res) => {
+app.get('/api/setup', async (req, res) => {
     try {
         console.log('Starting data generation...');
         

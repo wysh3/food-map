@@ -85,7 +85,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
             // Use pre-computed clusters for very low zoom
             sqlQuery = `
                 WITH tile_bounds AS (
-                    SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
                 )
                 SELECT 
                     'cluster' AS type,
@@ -104,7 +104,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         } else if (z <= 10) {
             sqlQuery = `
                 WITH tile_bounds AS (
-                    SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
                 )
                 SELECT 
                     'cluster' AS type,
@@ -123,7 +123,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         } else if (z <= 12) {
             sqlQuery = `
                 WITH tile_bounds AS (
-                    SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
                 )
                 SELECT 
                     'cluster' AS type,
@@ -143,7 +143,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
             // Light dynamic clustering for medium zoom
             sqlQuery = `
                 WITH tile_bounds AS (
-                    SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
                 ),
                 restaurants_in_tile AS (
                     SELECT id, name, cuisine, rating, lat, lon, city, geom
@@ -182,7 +182,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
             // Individual restaurants at high zoom
             sqlQuery = `
                 WITH tile_bounds AS (
-                    SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
                 )
                 SELECT 
                     'restaurant' AS type,
@@ -421,12 +421,12 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         // Test if ST_TileEnvelope exists and get bounds
         let boundsQuery = `
             SELECT 
-                ST_TileEnvelope($1, $2, $3) as geom,
-                ST_AsText(ST_TileEnvelope($1, $2, $3)) as bounds_text,
-                ST_XMin(ST_TileEnvelope($1, $2, $3)) as xmin,
-                ST_YMin(ST_TileEnvelope($1, $2, $3)) as ymin,
-                ST_XMax(ST_TileEnvelope($1, $2, $3)) as xmax,
-                ST_YMax(ST_TileEnvelope($1, $2, $3)) as ymax
+                ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) as geom,
+                ST_AsText(ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)) as bounds_text,
+                ST_XMin(ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)) as xmin,
+                ST_YMin(ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)) as ymin,
+                ST_XMax(ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)) as xmax,
+                ST_YMax(ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)) as ymax
         `;
         let boundsResult = await query(boundsQuery, [z, x, y]);
         
@@ -449,7 +449,7 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         // Test actual tile query
         const sqlQuery = `
             WITH tile_bounds AS (
-                SELECT ST_TileEnvelope($1, $2, $3) AS geom
+                SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
             )
             SELECT 
                 'restaurant' AS type,

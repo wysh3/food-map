@@ -57,8 +57,12 @@ export function latLonToTileCoords(lat, lon, z, x, y) {
     const ytile = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
     
     // Get position within this specific tile (0-1)
-    const xInTile = xtile - x;
-    const yInTile = ytile - y;
+    let xInTile = xtile - x;
+    let yInTile = ytile - y;
+    
+    // Clamp to valid range (0-1) to prevent "geometry exceeds extent" errors
+    xInTile = Math.max(0, Math.min(1, xInTile));
+    yInTile = Math.max(0, Math.min(1, yInTile));
     
     return { x: xInTile, y: yInTile };
 }

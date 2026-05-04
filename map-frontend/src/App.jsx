@@ -48,7 +48,6 @@ function App() {
       container: mapContainer.current,
       style: {
         version: 8,
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         sources: {
           'osm': {
             type: 'raster',

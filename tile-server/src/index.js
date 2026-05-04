@@ -219,7 +219,9 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         // Convert to tile coordinates and build features
         const features = result.rows
             .map(row => {
-                const tileCoords = latLonToTileCoords(row.lat, row.lon, z, x, y);
+                const lat = parseFloat(row.lat);
+                const lon = parseFloat(row.lon);
+                const tileCoords = latLonToTileCoords(lat, lon, z, x, y);
                 
                 return {
                     type: row.type,
@@ -388,11 +390,14 @@ function writeFeature(data, pbf) {
     pbf.writeVarintField(3, 1);
     
     // Geometry (tag 4)
-    const x = Math.round(feature.x * 4096);
-    const y = Math.round(feature.y * 4096);
+    // Clamp coordinates to valid tile extent (0-4096)
+    const x = Math.max(0, Math.min(4096, Math.round(feature.x * 4096)));
+    const y = Math.max(0, Math.min(4096, Math.round(feature.y * 4096)));
     
+    // For points, we use MoveTo command with absolute coordinates
+    // Command: (id << 3) | count, where id=1 for MoveTo
     const geometry = [
-        9, // MoveTo command (1 point)
+        9, // MoveTo command: (1 << 3) | 1 = 9 (move to 1 point)
         (x << 1) ^ (x >> 31), // Zigzag encode x
         (y << 1) ^ (y >> 31)  // Zigzag encode y
     ];

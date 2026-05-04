@@ -3,7 +3,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 
-const TILE_SERVER_URL = import.meta.env.VITE_TILE_SERVER_URL || 'http://localhost:3000';
+const TILE_SERVER_URL = import.meta.env.VITE_TILE_SERVER_URL || 'https://food-map-production.up.railway.app';
 
 // Indian cities coordinates
 const CITIES = {

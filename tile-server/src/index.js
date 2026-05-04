@@ -82,23 +82,35 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         let sqlQuery;
         
         if (z <= 8) {
-            // Use pre-computed clusters for very low zoom
+            // City-level clusters for very low zoom
             sqlQuery = `
                 WITH tile_bounds AS (
                     SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
+                ),
+                city_clusters AS (
+                    SELECT 
+                        city,
+                        COUNT(*) as point_count,
+                        AVG(rating) as avg_rating,
+                        AVG(lat) as lat,
+                        AVG(lon) as lon,
+                        ST_Centroid(ST_Collect(geom)) as geom
+                    FROM restaurants
+                    WHERE is_active = true
+                    GROUP BY city
                 )
                 SELECT 
                     'cluster' AS type,
                     NULL::integer AS id,
                     NULL AS name,
                     NULL AS cuisine,
-                    restaurant_clusters_z8.avg_rating AS rating,
-                    NULL AS city,
-                    restaurant_clusters_z8.point_count AS count,
-                    ST_Y(restaurant_clusters_z8.geom) AS lat,
-                    ST_X(restaurant_clusters_z8.geom) AS lon
-                FROM restaurant_clusters_z8, tile_bounds
-                WHERE ST_Intersects(restaurant_clusters_z8.geom, tile_bounds.geom)
+                    city_clusters.avg_rating AS rating,
+                    city_clusters.city AS city,
+                    city_clusters.point_count AS count,
+                    city_clusters.lat AS lat,
+                    city_clusters.lon AS lon
+                FROM city_clusters, tile_bounds
+                WHERE ST_Intersects(city_clusters.geom, tile_bounds.geom)
                 LIMIT 5000;
             `;
         } else if (z <= 10) {

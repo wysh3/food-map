@@ -411,6 +411,93 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Refresh materialized views endpoint
+app.get('/api/refresh-views', async (req, res) => {
+    try {
+        console.log('Refreshing materialized views...');
+        
+        // Drop and recreate views
+        await query(`DROP MATERIALIZED VIEW IF EXISTS restaurant_clusters_z8 CASCADE;`);
+        await query(`DROP MATERIALIZED VIEW IF EXISTS restaurant_clusters_z10 CASCADE;`);
+        await query(`DROP MATERIALIZED VIEW IF EXISTS restaurant_clusters_z12 CASCADE;`);
+        
+        await query(`
+            CREATE MATERIALIZED VIEW restaurant_clusters_z8 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 1.0) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX idx_clusters_z8_geom ON restaurant_clusters_z8 USING GIST(geom);`);
+        
+        await query(`
+            CREATE MATERIALIZED VIEW restaurant_clusters_z10 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 0.1) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX idx_clusters_z10_geom ON restaurant_clusters_z10 USING GIST(geom);`);
+        
+        await query(`
+            CREATE MATERIALIZED VIEW restaurant_clusters_z12 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 0.01) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX idx_clusters_z12_geom ON restaurant_clusters_z12 USING GIST(geom);`);
+        
+        const z8Count = await query('SELECT COUNT(*) as count FROM restaurant_clusters_z8');
+        const z10Count = await query('SELECT COUNT(*) as count FROM restaurant_clusters_z10');
+        const z12Count = await query('SELECT COUNT(*) as count FROM restaurant_clusters_z12');
+        
+        res.json({ 
+            message: 'Materialized views refreshed',
+            z8_clusters: z8Count.rows[0].count,
+            z10_clusters: z10Count.rows[0].count,
+            z12_clusters: z12Count.rows[0].count
+        });
+        
+    } catch (err) {
+        console.error('Refresh views error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Debug endpoint to test tile queries
 app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
     try {

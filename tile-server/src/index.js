@@ -217,29 +217,36 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         const result = await query(sqlQuery, [z, x, y]);
         
         // Convert to tile coordinates and build features
-        const features = result.rows.map(row => {
-            const tileCoords = latLonToTileCoords(row.lat, row.lon, z, x, y);
-            
-            return {
-                type: row.type,
-                x: tileCoords.x,
-                y: tileCoords.y,
-                properties: row.type === 'cluster' 
-                    ? { 
-                        type: 'cluster',
-                        count: parseInt(row.count),
-                        point_count: parseInt(row.count)
-                    }
-                    : {
-                        type: 'restaurant',
-                        id: row.id,
-                        name: row.name,
-                        cuisine: row.cuisine || 'Unknown',
-                        rating: parseFloat(row.rating) || 0,
-                        city: row.city || ''
-                    }
-            };
-        });
+        const features = result.rows
+            .map(row => {
+                const tileCoords = latLonToTileCoords(row.lat, row.lon, z, x, y);
+                
+                return {
+                    type: row.type,
+                    x: tileCoords.x,
+                    y: tileCoords.y,
+                    properties: row.type === 'cluster' 
+                        ? { 
+                            type: 'cluster',
+                            count: parseInt(row.count),
+                            point_count: parseInt(row.count)
+                        }
+                        : {
+                            type: 'restaurant',
+                            id: row.id,
+                            name: row.name,
+                            cuisine: row.cuisine || 'Unknown',
+                            rating: parseFloat(row.rating) || 0,
+                            city: row.city || ''
+                        }
+                };
+            })
+            .filter(feature => {
+                // Only include features within tile bounds (0-1 range)
+                // Allow small buffer for edge cases
+                return feature.x >= -0.1 && feature.x <= 1.1 && 
+                       feature.y >= -0.1 && feature.y <= 1.1;
+            });
         
         // Generate MVT tile
         const tile = generateSimpleMVT(features);

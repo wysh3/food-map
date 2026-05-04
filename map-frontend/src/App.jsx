@@ -188,7 +188,7 @@ function App() {
               <strong>Location:</strong> ${restaurant.area}, ${restaurant.city}
             </div>
             <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
-              ${restaurant.lat.toFixed(4)}, ${restaurant.lon.toFixed(4)}
+              ${parseFloat(restaurant.lat).toFixed(4)}, ${parseFloat(restaurant.lon).toFixed(4)}
             </div>
           </div>
         `;

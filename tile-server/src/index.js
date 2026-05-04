@@ -92,11 +92,11 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     NULL::integer AS id,
                     NULL AS name,
                     NULL AS cuisine,
-                    avg_rating AS rating,
+                    restaurant_clusters_z8.avg_rating AS rating,
                     NULL AS city,
-                    point_count AS count,
-                    ST_Y(geom) AS lat,
-                    ST_X(geom) AS lon
+                    restaurant_clusters_z8.point_count AS count,
+                    ST_Y(restaurant_clusters_z8.geom) AS lat,
+                    ST_X(restaurant_clusters_z8.geom) AS lon
                 FROM restaurant_clusters_z8, tile_bounds
                 WHERE ST_Intersects(restaurant_clusters_z8.geom, tile_bounds.geom)
                 LIMIT 5000;
@@ -111,11 +111,11 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     NULL::integer AS id,
                     NULL AS name,
                     NULL AS cuisine,
-                    avg_rating AS rating,
+                    restaurant_clusters_z10.avg_rating AS rating,
                     NULL AS city,
-                    point_count AS count,
-                    ST_Y(geom) AS lat,
-                    ST_X(geom) AS lon
+                    restaurant_clusters_z10.point_count AS count,
+                    ST_Y(restaurant_clusters_z10.geom) AS lat,
+                    ST_X(restaurant_clusters_z10.geom) AS lon
                 FROM restaurant_clusters_z10, tile_bounds
                 WHERE ST_Intersects(restaurant_clusters_z10.geom, tile_bounds.geom)
                 LIMIT 5000;
@@ -130,11 +130,11 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     NULL::integer AS id,
                     NULL AS name,
                     NULL AS cuisine,
-                    avg_rating AS rating,
+                    restaurant_clusters_z12.avg_rating AS rating,
                     NULL AS city,
-                    point_count AS count,
-                    ST_Y(geom) AS lat,
-                    ST_X(geom) AS lon
+                    restaurant_clusters_z12.point_count AS count,
+                    ST_Y(restaurant_clusters_z12.geom) AS lat,
+                    ST_X(restaurant_clusters_z12.geom) AS lon
                 FROM restaurant_clusters_z12, tile_bounds
                 WHERE ST_Intersects(restaurant_clusters_z12.geom, tile_bounds.geom)
                 LIMIT 5000;

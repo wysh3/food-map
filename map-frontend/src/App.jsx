@@ -68,7 +68,7 @@ function App() {
           'restaurants': {
             type: 'vector',
             tiles: [`${TILE_SERVER_URL}/tiles/{z}/{x}/{y}.mvt`],
-            minzoom: 6,
+            minzoom: 5,
             maxzoom: 18
           }
         },

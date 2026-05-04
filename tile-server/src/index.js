@@ -411,6 +411,53 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Debug endpoint to test tile queries
+app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
+    try {
+        const z = parseInt(req.params.z);
+        const x = parseInt(req.params.x);
+        const y = parseInt(req.params.y);
+        
+        // Test if ST_TileEnvelope exists
+        let testQuery = `SELECT ST_TileEnvelope($1, $2, $3) as geom`;
+        let testResult;
+        try {
+            testResult = await query(testQuery, [z, x, y]);
+        } catch (err) {
+            return res.json({ 
+                error: 'ST_TileEnvelope not available', 
+                message: err.message,
+                solution: 'Using fallback tile_bounds function'
+            });
+        }
+        
+        // Test actual tile query
+        const sqlQuery = `
+            WITH tile_bounds AS (
+                SELECT ST_TileEnvelope($1, $2, $3) AS geom
+            )
+            SELECT 
+                'restaurant' AS type,
+                id, name, cuisine, rating, city,
+                NULL::integer AS count,
+                lat, lon
+            FROM restaurants, tile_bounds
+            WHERE ST_Intersects(geom, tile_bounds.geom)
+            LIMIT 10;
+        `;
+        
+        const result = await query(sqlQuery, [z, x, y]);
+        
+        res.json({
+            tile: `${z}/${x}/${y}`,
+            features_found: result.rows.length,
+            sample_features: result.rows.slice(0, 3)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
 // Init endpoint - creates tables and schema
 app.get('/api/init', async (req, res) => {
     try {

@@ -5,15 +5,13 @@ import './App.css';
 
 const TILE_SERVER_URL = import.meta.env.VITE_TILE_SERVER_URL || 'https://food-map-production.up.railway.app';
 
-// Indian cities coordinates
+// Indian cities coordinates (cities with restaurant data)
 const CITIES = {
   mumbai: { center: [72.8777, 19.0760], zoom: 11 },
   delhi: { center: [77.2090, 28.6139], zoom: 11 },
   bangalore: { center: [77.5946, 12.9716], zoom: 11 },
   hyderabad: { center: [78.4867, 17.3850], zoom: 11 },
   chennai: { center: [80.2707, 13.0827], zoom: 11 },
-  pune: { center: [73.8567, 18.5204], zoom: 11 },
-  kolkata: { center: [88.3639, 22.5726], zoom: 11 },
   india: { center: [78.9629, 20.5937], zoom: 5 }
 };
 

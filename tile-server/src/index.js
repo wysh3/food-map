@@ -271,100 +271,113 @@ app.post('/api/cache/clear', (req, res) => {
     res.json({ message: 'Cache cleared' });
 });
 
-// Simple MVT generator (fixed parameter shadowing)
+// Simple MVT generator using correct pbf API
 function generateSimpleMVT(features) {
     const pbf = new Pbf();
     
-    // Write layer message (tag 3)
-    pbf.writeMessage(3, function(layer) {
-        // Layer name (tag 1)
-        layer.writeStringField(1, 'restaurants');
-        
-        // Version (tag 15)
-        layer.writeVarintField(15, 2);
-        
-        // Extent (tag 5)
-        layer.writeVarintField(5, 4096);
-        
-        // Collect all unique keys and values
-        const keys = [];
-        const keyIndex = {};
-        const values = [];
-        const valueIndex = {};
-        
-        features.forEach(function(f) {
-            Object.keys(f.properties).forEach(function(k) {
-                if (keyIndex[k] === undefined) {
-                    keyIndex[k] = keys.length;
-                    keys.push(k);
-                }
-            });
-            Object.values(f.properties).forEach(function(v) {
-                const key = typeof v + ':' + v;
-                if (valueIndex[key] === undefined) {
-                    valueIndex[key] = values.length;
-                    values.push(v);
-                }
-            });
+    // Collect all unique keys and values first
+    const keys = [];
+    const keyIndex = {};
+    const values = [];
+    const valueIndex = {};
+    
+    features.forEach(function(f) {
+        Object.keys(f.properties).forEach(function(k) {
+            if (keyIndex[k] === undefined) {
+                keyIndex[k] = keys.length;
+                keys.push(k);
+            }
         });
-        
-        // Write keys (tag 3)
-        keys.forEach(function(key) {
-            layer.writeStringField(3, key);
-        });
-        
-        // Write values (tag 4)
-        values.forEach(function(value) {
-            layer.writeMessage(4, function(v) {
-                if (typeof value === 'string') {
-                    v.writeStringField(1, value);
-                } else if (typeof value === 'number') {
-                    if (Number.isInteger(value)) {
-                        v.writeVarintField(6, value);
-                    } else {
-                        v.writeDoubleField(3, value);
-                    }
-                } else if (typeof value === 'boolean') {
-                    v.writeBooleanField(7, value);
-                }
-            });
-        });
-        
-        // Write features (tag 2)
-        features.forEach(function(feature, idx) {
-            layer.writeMessage(2, function(f) {
-                // ID (tag 1)
-                f.writeVarintField(1, idx);
-                
-                // Tags (tag 2) - property key-value pairs
-                const tags = [];
-                Object.entries(feature.properties).forEach(function(entry) {
-                    const key = entry[0];
-                    const value = entry[1];
-                    tags.push(keyIndex[key]);
-                    tags.push(valueIndex[typeof value + ':' + value]);
-                });
-                f.writePackedVarint(2, tags);
-                
-                // Type (tag 3) - 1 = point
-                f.writeVarintField(3, 1);
-                
-                // Geometry (tag 4)
-                const x = Math.round(feature.x * 4096);
-                const y = Math.round(feature.y * 4096);
-                
-                const geometry = [
-                    9, // MoveTo command (1 point)
-                    (x << 1) ^ (x >> 31), // Zigzag encode x
-                    (y << 1) ^ (y >> 31)  // Zigzag encode y
-                ];
-                
-                f.writePackedVarint(4, geometry);
-            });
+        Object.values(f.properties).forEach(function(v) {
+            const vKey = typeof v + ':' + v;
+            if (valueIndex[vKey] === undefined) {
+                valueIndex[vKey] = values.length;
+                values.push(v);
+            }
         });
     });
     
+    // Write layer with tag 3 (layer message in MVT spec)
+    pbf.writeMessage(3, writeLayer, { features, keys, keyIndex, values, valueIndex });
+    
     return Buffer.from(pbf.finish());
+}
+
+// Layer writer function - receives (obj, pbf)
+function writeLayer(data, pbf) {
+    const { features, keys, keyIndex, values, valueIndex } = data;
+    
+    // Layer name (tag 1)
+    pbf.writeStringField(1, 'restaurants');
+    
+    // Version (tag 15)
+    pbf.writeVarintField(15, 2);
+    
+    // Extent (tag 5)
+    pbf.writeVarintField(5, 4096);
+    
+    // Write keys (tag 3)
+    keys.forEach(function(key) {
+        pbf.writeStringField(3, key);
+    });
+    
+    // Write values (tag 4)
+    values.forEach(function(value) {
+        pbf.writeMessage(4, writeValue, value);
+    });
+    
+    // Write features (tag 2)
+    features.forEach(function(feature, idx) {
+        pbf.writeMessage(2, writeFeature, { feature, idx, keyIndex, valueIndex });
+    });
+}
+
+// Value writer function - receives (value, pbf)
+function writeValue(value, pbf) {
+    if (typeof value === 'string') {
+        pbf.writeStringField(1, value);
+    } else if (typeof value === 'number') {
+        if (Number.isInteger(value)) {
+            pbf.writeVarintField(6, value);
+        } else {
+            pbf.writeDoubleField(3, value);
+        }
+    } else if (typeof value === 'boolean') {
+        pbf.writeBooleanField(7, value);
+    }
+}
+
+// Feature writer function - receives (data, pbf)
+function writeFeature(data, pbf) {
+    const { feature, idx, keyIndex, valueIndex } = data;
+    
+    // ID (tag 1)
+    pbf.writeVarintField(1, idx);
+    
+    // Tags (tag 2) - property key-value pairs
+    const tags = [];
+    Object.entries(feature.properties).forEach(function(entry) {
+        const key = entry[0];
+        const value = entry[1];
+        tags.push(keyIndex[key]);
+        tags.push(valueIndex[typeof value + ':' + value]);
+    });
+    pbf.writePackedVarint(2, tags);
+    
+    // Type (tag 3) - 1 = point
+    pbf.writeVarintField(3, 1);
+    
+    // Geometry (tag 4)
+    const x = Math.round(feature.x * 4096);
+    const y = Math.round(feature.y * 4096);
+    
+    const geometry = [
+        9, // MoveTo command (1 point)
+        (x << 1) ^ (x >> 31), // Zigzag encode x
+        (y << 1) ^ (y >> 31)  // Zigzag encode y
+    ];
+    
+    pbf.writePackedVarint(4, geometry);
 }
 
 // Stats endpoint

@@ -384,6 +384,86 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Init endpoint - creates tables and schema
+app.get('/api/init', async (req, res) => {
+    try {
+        console.log('Creating database schema...');
+        
+        // Create tables and functions
+        await query(`
+            CREATE EXTENSION IF NOT EXISTS postgis;
+
+            CREATE TABLE IF NOT EXISTS restaurants (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                cuisine VARCHAR(100),
+                rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5),
+                lat DECIMAL(10, 8) NOT NULL,
+                lon DECIMAL(11, 8) NOT NULL,
+                geom GEOMETRY(Point, 4326),
+                city VARCHAR(100),
+                area VARCHAR(100),
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_restaurants_geom ON restaurants USING GIST(geom);
+            CREATE INDEX IF NOT EXISTS idx_restaurants_city ON restaurants(city);
+            CREATE INDEX IF NOT EXISTS idx_restaurants_active ON restaurants(is_active) WHERE is_active = true;
+        `);
+        
+        await query(`
+            CREATE OR REPLACE FUNCTION update_geom()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.geom = ST_SetSRID(ST_MakePoint(NEW.lon, NEW.lat), 4326);
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        
+        await query(`
+            DROP TRIGGER IF EXISTS restaurants_geom_trigger ON restaurants;
+            CREATE TRIGGER restaurants_geom_trigger
+                BEFORE INSERT OR UPDATE ON restaurants
+                FOR EACH ROW
+                EXECUTE FUNCTION update_geom();
+        `);
+        
+        await query(`
+            CREATE OR REPLACE FUNCTION tile_bounds(z INTEGER, x INTEGER, y INTEGER)
+            RETURNS GEOMETRY AS $$
+            DECLARE
+                max_val INTEGER;
+                resolution FLOAT;
+                x_min FLOAT;
+                y_min FLOAT;
+                x_max FLOAT;
+                y_max FLOAT;
+            BEGIN
+                max_val := (1 << z);
+                resolution := 360.0 / max_val;
+                
+                x_min := -180.0 + x * resolution;
+                x_max := x_min + resolution;
+                
+                y_max := 85.0511 - y * resolution * (170.1022 / 360.0);
+                y_min := y_max - resolution * (170.1022 / 360.0);
+                
+                RETURN ST_MakeEnvelope(x_min, y_min, x_max, y_max, 4326);
+            END;
+            $$ LANGUAGE plpgsql IMMUTABLE;
+        `);
+        
+        console.log('Schema created successfully');
+        res.json({ message: 'Database schema initialized. Now call /api/setup to load data.' });
+        
+    } catch (err) {
+        console.error('Init error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Setup endpoint - loads sample data (call this once after deployment)
 app.get('/api/setup', async (req, res) => {
     try {
@@ -428,6 +508,79 @@ app.get('/api/setup', async (req, res) => {
         }
         
         console.log('Refreshing materialized views...');
+        
+        // Create materialized views
+        await query(`
+            CREATE MATERIALIZED VIEW IF NOT EXISTS restaurant_clusters_z8 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 1.0) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX IF NOT EXISTS idx_clusters_z8_geom ON restaurant_clusters_z8 USING GIST(geom);`);
+        
+        await query(`
+            CREATE MATERIALIZED VIEW IF NOT EXISTS restaurant_clusters_z10 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 0.1) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX IF NOT EXISTS idx_clusters_z10_geom ON restaurant_clusters_z10 USING GIST(geom);`);
+        
+        await query(`
+            CREATE MATERIALIZED VIEW IF NOT EXISTS restaurant_clusters_z12 AS
+            SELECT 
+                row_number() OVER () as id,
+                COUNT(*) as point_count,
+                ST_Centroid(ST_Collect(geom)) as geom,
+                ROUND(AVG(rating)::numeric, 1) as avg_rating
+            FROM (
+                SELECT 
+                    ST_SnapToGrid(geom, 0.01) as grid,
+                    geom, rating
+                FROM restaurants 
+                WHERE is_active = true
+            ) sub
+            GROUP BY grid
+            HAVING COUNT(*) > 1;
+        `);
+        
+        await query(`CREATE INDEX IF NOT EXISTS idx_clusters_z12_geom ON restaurant_clusters_z12 USING GIST(geom);`);
+        
+        await query(`
+            CREATE OR REPLACE FUNCTION refresh_clusters()
+            RETURNS void AS $$
+            BEGIN
+                REFRESH MATERIALIZED VIEW CONCURRENTLY restaurant_clusters_z8;
+                REFRESH MATERIALIZED VIEW CONCURRENTLY restaurant_clusters_z10;
+                REFRESH MATERIALIZED VIEW CONCURRENTLY restaurant_clusters_z12;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        
         await query('SELECT refresh_clusters()');
         
         console.log('Setup complete!');

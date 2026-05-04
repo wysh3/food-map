@@ -168,11 +168,19 @@ function App() {
       if (e.features.length === 0) return;
 
       const feature = e.features[0];
-      const { id, name, cuisine, rating, city } = feature.properties;
+      const { id, name, cuisine, rating, city, type } = feature.properties;
+
+      // Only fetch details for actual restaurants, not clusters
+      if (type === 'cluster' || !id || id < 0) {
+        return;
+      }
 
       // Fetch full details
       try {
         const response = await fetch(`${TILE_SERVER_URL}/api/restaurants/${id}`);
+        if (!response.ok) {
+          throw new Error('Restaurant not found');
+        }
         const restaurant = await response.json();
 
         const html = `

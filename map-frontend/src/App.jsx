@@ -131,20 +131,19 @@ function App() {
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                13, 6,
-                16, 10,
-                18, 14
+                13, 8,
+                16, 12,
+                18, 16
               ],
               'circle-color': [
-                'interpolate',
-                ['linear'],
+                'step',
                 ['get', 'rating'],
-                0, '#94A3B8',
-                3, '#60A5FA',
-                4, '#34D399',
-                5, '#10B981'
+                '#EF4444',  // Red for <3 stars
+                3, '#F59E0B',  // Amber for 3-4 stars
+                4, '#10B981',  // Green for 4-4.5 stars
+                4.5, '#3B82F6'  // Blue for 4.5+ stars
               ],
-              'circle-opacity': 0.9,
+              'circle-opacity': 0.85,
               'circle-stroke-width': 2,
               'circle-stroke-color': '#ffffff'
             }
@@ -293,12 +292,20 @@ function App() {
           <span>Cluster (100-500)</span>
         </div>
         <div className="legend-item">
-          <div className="legend-color" style={{ background: '#10B981' }}></div>
-          <span>Restaurant (4.5+ ⭐)</span>
+          <div className="legend-color" style={{ background: '#3B82F6' }}></div>
+          <span>⭐ 4.5+ (Excellent)</span>
         </div>
         <div className="legend-item">
-          <div className="legend-color" style={{ background: '#60A5FA' }}></div>
-          <span>Restaurant (3-4 ⭐)</span>
+          <div className="legend-color" style={{ background: '#10B981' }}></div>
+          <span>⭐ 4.0-4.5 (Good)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ background: '#F59E0B' }}></div>
+          <span>⭐ 3.0-4.0 (Average)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ background: '#EF4444' }}></div>
+          <span>⭐ <3.0 (Below Average)</span>
         </div>
       </div>
 

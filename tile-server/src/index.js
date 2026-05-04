@@ -418,18 +418,33 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         const x = parseInt(req.params.x);
         const y = parseInt(req.params.y);
         
-        // Test if ST_TileEnvelope exists
-        let testQuery = `SELECT ST_TileEnvelope($1, $2, $3) as geom`;
-        let testResult;
-        try {
-            testResult = await query(testQuery, [z, x, y]);
-        } catch (err) {
-            return res.json({ 
-                error: 'ST_TileEnvelope not available', 
-                message: err.message,
-                solution: 'Using fallback tile_bounds function'
-            });
-        }
+        // Test if ST_TileEnvelope exists and get bounds
+        let boundsQuery = `
+            SELECT 
+                ST_TileEnvelope($1, $2, $3) as geom,
+                ST_AsText(ST_TileEnvelope($1, $2, $3)) as bounds_text,
+                ST_XMin(ST_TileEnvelope($1, $2, $3)) as xmin,
+                ST_YMin(ST_TileEnvelope($1, $2, $3)) as ymin,
+                ST_XMax(ST_TileEnvelope($1, $2, $3)) as xmax,
+                ST_YMax(ST_TileEnvelope($1, $2, $3)) as ymax
+        `;
+        let boundsResult = await query(boundsQuery, [z, x, y]);
+        
+        // Count restaurants in Mumbai area
+        const mumbaiCount = await query(`
+            SELECT COUNT(*) as count 
+            FROM restaurants 
+            WHERE city = 'Mumbai'
+        `);
+        
+        // Get sample Mumbai restaurants
+        const mumbaiSample = await query(`
+            SELECT id, name, lat, lon, 
+                   ST_AsText(geom) as geom_text
+            FROM restaurants 
+            WHERE city = 'Mumbai'
+            LIMIT 3
+        `);
         
         // Test actual tile query
         const sqlQuery = `
@@ -440,7 +455,8 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
                 'restaurant' AS type,
                 id, name, cuisine, rating, city,
                 NULL::integer AS count,
-                lat, lon
+                lat, lon,
+                ST_AsText(restaurants.geom) as geom_text
             FROM restaurants, tile_bounds
             WHERE ST_Intersects(restaurants.geom, tile_bounds.geom)
             LIMIT 10;
@@ -450,6 +466,9 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         
         res.json({
             tile: `${z}/${x}/${y}`,
+            tile_bounds: boundsResult.rows[0],
+            mumbai_restaurants: mumbaiCount.rows[0].count,
+            mumbai_sample: mumbaiSample.rows,
             features_found: result.rows.length,
             sample_features: result.rows.slice(0, 3)
         });

@@ -109,8 +109,11 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     city_clusters.count AS count,
                     city_clusters.lat AS lat,
                     city_clusters.lon AS lon
-                FROM city_clusters, tile_bounds
-                WHERE ST_Intersects(city_clusters.geom, tile_bounds.geom)
+                FROM city_clusters
+                WHERE ST_Intersects(
+                    city_clusters.geom, 
+                    (SELECT geom FROM tile_bounds)
+                )
                 LIMIT 5000;
             `;
         } else if (z <= 10) {
@@ -190,8 +193,8 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                 GROUP BY cluster_id, id, name, cuisine, rating, lat, lon, city, geom
                 LIMIT 5000;
             `;
-        } else {
-            // Individual restaurants at high zoom
+        } else if (z <= 13) {
+            // Show individual restaurants starting at zoom 14+
             sqlQuery = `
                 WITH tile_bounds AS (
                     SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
@@ -206,10 +209,31 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     NULL::bigint AS count,
                     restaurants.lat::numeric AS lat,
                     restaurants.lon::numeric AS lon
-                FROM restaurants, tile_bounds
+                FROM restaurants
                 WHERE restaurants.is_active = true
-                  AND ST_Intersects(restaurants.geom, tile_bounds.geom)
-                LIMIT 5000;
+                  AND ST_Intersects(restaurants.geom, (SELECT geom FROM tile_bounds))
+                LIMIT 2000;
+            `;
+        } else {
+            // Individual restaurants at very high zoom (14+)
+            sqlQuery = `
+                WITH tile_bounds AS (
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
+                )
+                SELECT 
+                    'restaurant' AS type,
+                    restaurants.id,
+                    restaurants.name,
+                    restaurants.cuisine,
+                    restaurants.rating,
+                    restaurants.city,
+                    NULL::bigint AS count,
+                    restaurants.lat::numeric AS lat,
+                    restaurants.lon::numeric AS lon
+                FROM restaurants
+                WHERE restaurants.is_active = true
+                  AND ST_Intersects(restaurants.geom, (SELECT geom FROM tile_bounds))
+                LIMIT 1000;
             `;
         }
         
@@ -226,6 +250,8 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     type: row.type,
                     x: tileCoords.x,
                     y: tileCoords.y,
+                    lat: lat,
+                    lon: lon,
                     properties: row.type === 'cluster' 
                         ? { 
                             type: 'cluster',
@@ -241,6 +267,19 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                             city: row.city || ''
                         }
                 };
+            })
+            .filter(feature => {
+                // CRITICAL: Only include features that are actually within this tile
+                // If coordinates are outside 0-1 range, the feature belongs in a different tile
+                // This prevents the "line" effect where features are rendered at wrong positions
+                const inBounds = feature.x >= 0 && feature.x <= 1 && feature.y >= 0 && feature.y <= 1;
+                
+                if (!inBounds && z <= 8) {
+                    // Log when city clusters are filtered out (helps debug tile coverage)
+                    console.log(`Filtered out feature at z${z} tile ${x},${y}: coords (${feature.x.toFixed(3)}, ${feature.y.toFixed(3)}) - lat/lon: ${feature.lat.toFixed(2)}, ${feature.lon.toFixed(2)}`);
+                }
+                
+                return inBounds;
             });
         
         // Generate MVT tile

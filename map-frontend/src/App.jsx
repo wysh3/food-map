@@ -131,15 +131,17 @@ function App() {
             source: 'restaurants',
             'source-layer': 'restaurants',
             filter: ['==', ['get', 'type'], 'restaurant'],
+            minzoom: 13,
             paint: {
               'circle-radius': [
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                12, 5,
-                13, 8,
-                16, 12,
-                18, 16
+                13, 4,
+                14, 6,
+                15, 8,
+                16, 10,
+                18, 14
               ],
               'circle-color': [
                 'step',
@@ -149,8 +151,8 @@ function App() {
                 4, '#10B981',  // Green for 4-4.5 stars
                 4.5, '#3B82F6'  // Blue for 4.5+ stars
               ],
-              'circle-opacity': 0.9,
-              'circle-stroke-width': 2,
+              'circle-opacity': 0.85,
+              'circle-stroke-width': 1.5,
               'circle-stroke-color': '#ffffff'
             }
           }

@@ -83,6 +83,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
         
         if (z <= 8) {
             // City-level clusters for very low zoom - show all cities
+            // Note: We accept z,x,y parameters but don't use them to show all cities
             sqlQuery = `
                 SELECT 
                     'cluster' AS type,
@@ -95,7 +96,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     AVG(lat) AS lat,
                     AVG(lon) AS lon
                 FROM restaurants
-                WHERE is_active = true
+                WHERE is_active = true AND $1 IS NOT NULL
                 GROUP BY city
                 LIMIT 5000;
             `;

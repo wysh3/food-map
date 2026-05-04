@@ -271,7 +271,7 @@ app.post('/api/cache/clear', (req, res) => {
     res.json({ message: 'Cache cleared' });
 });
 
-// Simple MVT generator
+// Simple MVT generator (fixed parameter shadowing)
 function generateSimpleMVT(features) {
     const pbf = new Pbf();
     

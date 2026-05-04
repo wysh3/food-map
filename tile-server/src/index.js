@@ -275,74 +275,81 @@ app.post('/api/cache/clear', (req, res) => {
 function generateSimpleMVT(features) {
     const pbf = new Pbf();
     
-    // Write layer
-    pbf.writeMessage(3, (layerPbf) => {
-        // Layer name
-        layerPbf.writeStringField(1, 'restaurants');
+    // Write layer message (tag 3)
+    pbf.writeMessage(3, function(layer) {
+        // Layer name (tag 1)
+        layer.writeStringField(1, 'restaurants');
         
-        // Version
-        layerPbf.writeVarintField(15, 2);
+        // Version (tag 15)
+        layer.writeVarintField(15, 2);
         
-        // Extent
-        layerPbf.writeVarintField(5, 4096);
+        // Extent (tag 5)
+        layer.writeVarintField(5, 4096);
         
         // Collect all unique keys and values
-        const keys = new Set();
-        const values = new Map();
+        const keys = [];
+        const keyIndex = {};
+        const values = [];
+        const valueIndex = {};
         
-        features.forEach(f => {
-            Object.keys(f.properties).forEach(k => keys.add(k));
-            Object.values(f.properties).forEach(v => {
-                const key = JSON.stringify(v);
-                if (!values.has(key)) {
-                    values.set(key, v);
+        features.forEach(function(f) {
+            Object.keys(f.properties).forEach(function(k) {
+                if (keyIndex[k] === undefined) {
+                    keyIndex[k] = keys.length;
+                    keys.push(k);
+                }
+            });
+            Object.values(f.properties).forEach(function(v) {
+                const key = typeof v + ':' + v;
+                if (valueIndex[key] === undefined) {
+                    valueIndex[key] = values.length;
+                    values.push(v);
                 }
             });
         });
         
-        const keysArray = Array.from(keys);
-        const valuesArray = Array.from(values.values());
-        
-        // Write keys
-        keysArray.forEach(key => {
-            layerPbf.writeStringField(3, key);
+        // Write keys (tag 3)
+        keys.forEach(function(key) {
+            layer.writeStringField(3, key);
         });
         
-        // Write values
-        valuesArray.forEach(value => {
-            layerPbf.writeMessage(4, (valuePbf) => {
+        // Write values (tag 4)
+        values.forEach(function(value) {
+            layer.writeMessage(4, function(v) {
                 if (typeof value === 'string') {
-                    valuePbf.writeStringField(1, value);
+                    v.writeStringField(1, value);
                 } else if (typeof value === 'number') {
                     if (Number.isInteger(value)) {
-                        valuePbf.writeVarintField(6, value);
+                        v.writeVarintField(6, value);
                     } else {
-                        valuePbf.writeDoubleField(3, value);
+                        v.writeDoubleField(3, value);
                     }
                 } else if (typeof value === 'boolean') {
-                    valuePbf.writeBooleanField(7, value);
+                    v.writeBooleanField(7, value);
                 }
             });
         });
         
-        // Write features
-        features.forEach((feature, idx) => {
-            layerPbf.writeMessage(2, (featurePbf) => {
-                // ID
-                featurePbf.writeVarintField(1, idx);
+        // Write features (tag 2)
+        features.forEach(function(feature, idx) {
+            layer.writeMessage(2, function(f) {
+                // ID (tag 1)
+                f.writeVarintField(1, idx);
                 
-                // Tags (property key-value pairs)
+                // Tags (tag 2) - property key-value pairs
                 const tags = [];
-                Object.entries(feature.properties).forEach(([key, value]) => {
-                    tags.push(keysArray.indexOf(key));
-                    tags.push(valuesArray.indexOf(value));
+                Object.entries(feature.properties).forEach(function(entry) {
+                    const key = entry[0];
+                    const value = entry[1];
+                    tags.push(keyIndex[key]);
+                    tags.push(valueIndex[typeof value + ':' + value]);
                 });
-                featurePbf.writePackedVarint(2, tags);
+                f.writePackedVarint(2, tags);
                 
-                // Type (1 = point)
-                featurePbf.writeVarintField(3, 1);
+                // Type (tag 3) - 1 = point
+                f.writeVarintField(3, 1);
                 
-                // Geometry
+                // Geometry (tag 4)
                 const x = Math.round(feature.x * 4096);
                 const y = Math.round(feature.y * 4096);
                 
@@ -352,7 +359,7 @@ function generateSimpleMVT(features) {
                     (y << 1) ^ (y >> 31)  // Zigzag encode y
                 ];
                 
-                featurePbf.writePackedVarint(4, geometry);
+                f.writePackedVarint(4, geometry);
             });
         });
     });

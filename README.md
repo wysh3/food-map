@@ -1,52 +1,210 @@
-# Food Delivery Map
+# 🍽️ Food Delivery Map - India
 
-This is a working prototype that shows how to build a restaurant map that stays fast even with thousands of restaurants. Think Swiggy or Zomato's map view.
+A high-performance vector tile map visualization of 84,000+ restaurants across 5 major Indian cities, built with React, MapLibre GL, Node.js, PostgreSQL/PostGIS, and deployed on Railway + Vercel.
 
-The problem: Most map implementations break down when you have 10,000+ restaurants. Pins go missing, panning gets laggy, and the map becomes a mess at low zoom levels.
+## 🚀 Live Demo
 
-This prototype solves that using vector tiles and server-side clustering. It handles 50,000+ restaurants across Indian cities without breaking a sweat.
+**Frontend:** https://food-map-phi.vercel.app/  
+**Backend API:** https://food-map-production.up.railway.app/
 
-## Running It
+## ✨ Features
 
-```bash
-chmod +x setup.sh
-./setup.sh
+- **Real-time Vector Tiles**: Efficient MVT (Mapbox Vector Tiles) generation with server-side clustering
+- **84,369 Restaurants**: Across Mumbai, Delhi, Bangalore, Hyderabad, and Chennai
+- **Smart Clustering**: 
+  - City-level clusters at low zoom (z ≤ 8)
+  - Dynamic clustering at medium zoom (z 9-12)
+  - Individual restaurants at high zoom (z ≥ 13)
+- **Interactive Map**: Click restaurants for details (name, cuisine, rating, location)
+- **Optimized Performance**: 
+  - Materialized views for pre-computed clusters
+  - In-memory tile caching
+  - PostGIS spatial indexing
 
-# Start the tile server
-cd tile-server && npm start
+## 🏗️ Architecture
 
-# In another terminal, start the frontend
-cd map-frontend && npm run dev
+### Frontend
+- **Framework**: React 18 + Vite
+- **Map Library**: MapLibre GL JS 3.6
+- **Styling**: Custom CSS with responsive design
+- **Deployment**: Vercel (auto-deploy from GitHub)
 
-# Open http://localhost:5173
+### Backend
+- **Runtime**: Node.js + Express
+- **Database**: PostgreSQL 15 + PostGIS 3.7
+- **Tile Generation**: Custom MVT encoder using `pbf` library
+- **Caching**: LRU cache for tile responses
+- **Deployment**: Railway (Docker container)
+
+### Database Schema
+```sql
+CREATE TABLE restaurants (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    cuisine VARCHAR(100),
+    rating DECIMAL(2,1),
+    lat DECIMAL(10,8),
+    lon DECIMAL(11,8),
+    geom GEOMETRY(Point, 4326),
+    city VARCHAR(100),
+    area VARCHAR(100),
+    is_active BOOLEAN DEFAULT true
+);
+
+CREATE INDEX idx_restaurants_geom ON restaurants USING GIST(geom);
 ```
 
-You'll see restaurants across Mumbai, Delhi, Bangalore, Hyderabad, Chennai, Pune, and Kolkata. Try zooming from country-level down to street-level. Notice how clusters break apart smoothly and panning stays responsive.
+## 📊 Data Distribution
 
-## How It Works
+| City | Restaurants |
+|------|-------------|
+| Mumbai | 23,100 |
+| Delhi | 18,720 |
+| Bangalore | 18,149 |
+| Hyderabad | 13,200 |
+| Chennai | 11,200 |
+| **Total** | **84,369** |
 
-**The stack:**
-- PostGIS for spatial queries and clustering
-- Node.js tile server with an LRU cache
-- MapLibre GL JS for rendering
-- Mapbox Vector Tiles (MVT) format
+## 🛠️ Technical Highlights
 
-**The key ideas:**
+### Vector Tile Generation
+- Custom MVT encoder handling coordinate transformation (EPSG:4326 → tile coordinates)
+- Efficient clustering using PostGIS `ST_ClusterDBSCAN` and `ST_SnapToGrid`
+- Proper handling of tile bounds with `ST_TileEnvelope` and `ST_Transform`
 
-Instead of sending all restaurants as JSON (which would be huge), the map requests small tiles. Each tile covers a specific geographic area at a specific zoom level. The tiles are tiny (2-8 KB) and cacheable.
+### Performance Optimizations
+1. **Materialized Views**: Pre-computed clusters for zoom levels 8, 10, 12
+2. **Spatial Indexing**: GIST indexes on geometry columns
+3. **Tile Caching**: LRU cache with configurable TTL
+4. **Query Optimization**: Zoom-based query strategies
 
-At low zoom levels, restaurants are pre-clustered using PostgreSQL materialized views. This means clustering happens once when data loads, not on every request. At high zoom levels, you see individual restaurants.
+### Coordinate System Handling
+- Restaurants stored in WGS84 (EPSG:4326)
+- Tile bounds transformed from Web Mercator (EPSG:3857)
+- Proper coordinate conversion for MVT encoding
 
-The tile server has an LRU cache that keeps the 10,000 most recently used tiles in memory. This gives a 95%+ cache hit rate, which means most requests return in under 10ms.
+## 🚦 API Endpoints
 
-## Performance
+### Tile Endpoint
+```
+GET /tiles/{z}/{x}/{y}.mvt
+```
+Returns Mapbox Vector Tile with restaurant data
 
-Cached tiles respond in under 10ms. Uncached tiles take 20-80ms. The frontend renders at 60fps even when panning aggressively. Tiles are 2-8 KB each, and spatial indexing guarantees no pins go missing.
+### Statistics
+```
+GET /api/stats
+```
+Returns aggregate statistics (total restaurants, cities, ratings)
 
-## Why This Approach
+### Restaurant Details
+```
+GET /api/restaurants/:id
+```
+Returns detailed information for a specific restaurant
 
-This architecture is used by production systems. Martin (MapLibre's tile server) uses materialized views for clustering. Clusterbuster uses LRU caching for high concurrency. Swiggy uses Redis geohash for nearby queries. Supercluster (by Mapbox) handles millions of points the same way.
+### Health Check
+```
+GET /health
+```
+Returns server health status
 
-The prototype demonstrates the core patterns. Scaling to production means deploying Martin (a Rust tile server that's 10x faster), adding Redis for distributed caching, pre-generating tiles for low zoom levels, putting a CDN in front, and setting up read replicas.
+## 🎨 Map Visualization
 
-See [DESIGN.md](./DESIGN.md) for the full architecture and scaling strategy.
+### Color Scheme
+- **Clusters**: 
+  - 🔴 Red (500+ restaurants)
+  - 🟠 Orange (100-500)
+  - 🟡 Yellow (50-100)
+  - 🟢 Green (10-50)
+- **Individual Restaurants**:
+  - 🟢 Green (4.5+ ⭐)
+  - 🔵 Blue (3-4 ⭐)
+  - ⚪ Gray (<3 ⭐)
+
+### Zoom Levels
+- **Z5-8**: City-level clusters (5 cities)
+- **Z9-12**: Area-level clusters (dynamic)
+- **Z13+**: Individual restaurant points
+
+## 🔧 Local Development
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 15+ with PostGIS extension
+- Docker (optional)
+
+### Setup
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/wysh3/food-map.git
+cd food-map
+```
+
+2. **Backend Setup**
+```bash
+cd tile-server
+npm install
+cp .env.example .env
+# Edit .env with your database credentials
+npm start
+```
+
+3. **Initialize Database**
+```bash
+curl http://localhost:8080/api/init
+curl http://localhost:8080/api/setup
+curl http://localhost:8080/api/refresh-views
+```
+
+4. **Frontend Setup**
+```bash
+cd map-frontend
+npm install
+npm run dev
+```
+
+5. **Access**
+- Frontend: http://localhost:5173
+- Backend: http://localhost:8080
+
+## 📦 Deployment
+
+### Backend (Railway)
+1. Connect GitHub repository
+2. Set environment variables:
+   - `DATABASE_URL`: PostgreSQL connection string
+   - `PORT`: 8080 (auto-set by Railway)
+3. Deploy automatically on push to main
+
+### Frontend (Vercel)
+1. Connect GitHub repository
+2. Set build command: `npm run build`
+3. Set output directory: `dist`
+4. Set environment variable:
+   - `VITE_TILE_SERVER_URL`: Backend URL
+5. Deploy automatically on push to main
+
+## 🐛 Troubleshooting
+
+### Empty tiles at low zoom
+Run: `curl https://your-backend.railway.app/api/refresh-views`
+
+### CORS errors
+Ensure backend has `cors()` middleware enabled
+
+### Coordinate mismatch
+Verify `ST_Transform(..., 4326)` is used for tile bounds
+
+## 📝 License
+
+MIT
+
+## 👤 Author
+
+Built for technical interview demonstration
+
+---
+
+**Tech Stack**: React • Node.js • PostgreSQL • PostGIS • MapLibre GL • Railway • Vercel

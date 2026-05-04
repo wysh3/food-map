@@ -20,15 +20,27 @@ function App() {
   const map = useRef(null);
   const popup = useRef(null);
   const [stats, setStats] = useState(null);
-  const [performance, setPerformance] = useState({ fps: 60, tileCount: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedCity, setSelectedCity] = useState('india');
 
   useEffect(() => {
     // Fetch stats
+    setLoading(true);
     fetch(`${TILE_SERVER_URL}/api/stats`)
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(err => console.error('Failed to fetch stats:', err));
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load statistics');
+        return res.json();
+      })
+      .then(data => {
+        setStats(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch stats:', err);
+        setError('Unable to load restaurant data');
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

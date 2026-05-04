@@ -91,10 +91,10 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     SELECT 
                         city,
                         COUNT(*) as count,
-                        AVG(rating) as rating,
-                        AVG(lat) as lat,
-                        AVG(lon) as lon,
-                        ST_SetSRID(ST_MakePoint(AVG(lon), AVG(lat)), 4326) as geom
+                        AVG(rating::numeric) as rating,
+                        AVG(lat::numeric) as lat,
+                        AVG(lon::numeric) as lon,
+                        ST_SetSRID(ST_MakePoint(AVG(lon::numeric), AVG(lat::numeric)), 4326) as geom
                     FROM restaurants
                     WHERE is_active = true
                     GROUP BY city
@@ -127,8 +127,8 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     restaurant_clusters_z10.avg_rating AS rating,
                     NULL AS city,
                     restaurant_clusters_z10.point_count AS count,
-                    ST_Y(restaurant_clusters_z10.geom) AS lat,
-                    ST_X(restaurant_clusters_z10.geom) AS lon
+                    ST_Y(restaurant_clusters_z10.geom)::numeric AS lat,
+                    ST_X(restaurant_clusters_z10.geom)::numeric AS lon
                 FROM restaurant_clusters_z10, tile_bounds
                 WHERE ST_Intersects(restaurant_clusters_z10.geom, tile_bounds.geom)
                 LIMIT 5000;
@@ -146,8 +146,8 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     restaurant_clusters_z12.avg_rating AS rating,
                     NULL AS city,
                     restaurant_clusters_z12.point_count AS count,
-                    ST_Y(restaurant_clusters_z12.geom) AS lat,
-                    ST_X(restaurant_clusters_z12.geom) AS lon
+                    ST_Y(restaurant_clusters_z12.geom)::numeric AS lat,
+                    ST_X(restaurant_clusters_z12.geom)::numeric AS lon
                 FROM restaurant_clusters_z12, tile_bounds
                 WHERE ST_Intersects(restaurant_clusters_z12.geom, tile_bounds.geom)
                 LIMIT 5000;
@@ -182,11 +182,11 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     CASE WHEN cluster_id IS NOT NULL THEN NULL ELSE id END AS id,
                     CASE WHEN cluster_id IS NOT NULL THEN NULL ELSE name END AS name,
                     CASE WHEN cluster_id IS NOT NULL THEN NULL ELSE cuisine END AS cuisine,
-                    CASE WHEN cluster_id IS NOT NULL THEN AVG(rating) ELSE rating END AS rating,
+                    CASE WHEN cluster_id IS NOT NULL THEN AVG(rating::numeric) ELSE rating END AS rating,
                     CASE WHEN cluster_id IS NOT NULL THEN NULL ELSE city END AS city,
                     CASE WHEN cluster_id IS NOT NULL THEN COUNT(*) ELSE NULL END AS count,
-                    CASE WHEN cluster_id IS NOT NULL THEN ST_Y(ST_Centroid(ST_Collect(geom))) ELSE lat END AS lat,
-                    CASE WHEN cluster_id IS NOT NULL THEN ST_X(ST_Centroid(ST_Collect(geom))) ELSE lon END AS lon
+                    CASE WHEN cluster_id IS NOT NULL THEN ST_Y(ST_Centroid(ST_Collect(geom)))::numeric ELSE lat::numeric END AS lat,
+                    CASE WHEN cluster_id IS NOT NULL THEN ST_X(ST_Centroid(ST_Collect(geom)))::numeric ELSE lon::numeric END AS lon
                 FROM clustered
                 GROUP BY cluster_id, id, name, cuisine, rating, lat, lon, city, geom
                 LIMIT 5000;
@@ -205,8 +205,8 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     restaurants.rating,
                     restaurants.city,
                     NULL::bigint AS count,
-                    restaurants.lat,
-                    restaurants.lon
+                    restaurants.lat::numeric AS lat,
+                    restaurants.lon::numeric AS lon
                 FROM restaurants, tile_bounds
                 WHERE restaurants.is_active = true
                   AND ST_Intersects(restaurants.geom, tile_bounds.geom)
@@ -390,9 +390,9 @@ function writeFeature(data, pbf) {
     pbf.writeVarintField(3, 1);
     
     // Geometry (tag 4)
-    // Clamp coordinates to valid tile extent (0-4096)
-    const x = Math.max(0, Math.min(4096, Math.round(feature.x * 4096)));
-    const y = Math.max(0, Math.min(4096, Math.round(feature.y * 4096)));
+    // Convert 0-1 coordinates to tile extent (0-4096)
+    const x = Math.round(feature.x * 4096);
+    const y = Math.round(feature.y * 4096);
     
     // For points, we use MoveTo command with absolute coordinates
     // Command: (id << 3) | count, where id=1 for MoveTo

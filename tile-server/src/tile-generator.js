@@ -50,11 +50,16 @@ export function generateMVT(features, z, x, y) {
  * @returns {Object} - {x, y} in tile coordinates (0-1)
  */
 export function latLonToTileCoords(lat, lon, z, x, y) {
+    // Ensure lat/lon are numbers
+    lat = parseFloat(lat);
+    lon = parseFloat(lon);
+    
     const n = Math.pow(2, z);
     
-    // Convert lat/lon to tile coordinates
+    // Convert lat/lon to global tile coordinates (Web Mercator projection)
     const xtile = (lon + 180) / 360 * n;
-    const ytile = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+    const latRad = lat * Math.PI / 180;
+    const ytile = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
     
     // Get position within this specific tile (0-1)
     const xInTile = xtile - x;

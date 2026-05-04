@@ -98,25 +98,45 @@ function App() {
               'circle-radius': [
                 'interpolate',
                 ['linear'],
-                ['get', 'count'],
+                ['get', 'point_count'],
+                1, 15,
                 10, 20,
                 50, 30,
                 100, 40,
                 500, 50,
-                1000, 60
+                1000, 60,
+                5000, 70,
+                10000, 80
               ],
               'circle-color': [
                 'interpolate',
                 ['linear'],
-                ['get', 'count'],
+                ['get', 'point_count'],
+                1, '#FED766',
                 10, '#FED766',
                 50, '#FE9920',
                 100, '#FE6B35',
-                500, '#F94144'
+                500, '#F94144',
+                1000, '#C41E3A'
               ],
               'circle-opacity': 0.8,
               'circle-stroke-width': 2,
               'circle-stroke-color': '#ffffff'
+            }
+          },
+          {
+            id: 'cluster-count',
+            type: 'symbol',
+            source: 'restaurants',
+            'source-layer': 'restaurants',
+            filter: ['==', ['get', 'type'], 'cluster'],
+            layout: {
+              'text-field': ['get', 'point_count'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+              'text-size': 12
+            },
+            paint: {
+              'text-color': '#ffffff'
             }
           },
 

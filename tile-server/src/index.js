@@ -551,7 +551,7 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         
         // Get sample Mumbai restaurants
         const mumbaiSample = await query(`
-            SELECT id, name, lat, lon, 
+            SELECT id, name, lat::numeric as lat, lon::numeric as lon, 
                    ST_AsText(geom) as geom_text
             FROM restaurants 
             WHERE city = 'Mumbai'
@@ -567,11 +567,11 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
                     NULL::integer AS id,
                     NULL AS name,
                     NULL AS cuisine,
-                    AVG(rating) AS rating,
+                    AVG(rating::numeric) AS rating,
                     city AS city,
                     COUNT(*) AS count,
-                    AVG(lat) AS lat,
-                    AVG(lon) AS lon
+                    AVG(lat::numeric) AS lat,
+                    AVG(lon::numeric) AS lon
                 FROM restaurants
                 WHERE is_active = true
                 GROUP BY city
@@ -586,7 +586,7 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
                     'restaurant' AS type,
                     id, name, cuisine, rating, city,
                     NULL::integer AS count,
-                    lat, lon,
+                    lat::numeric as lat, lon::numeric as lon,
                     ST_AsText(restaurants.geom) as geom_text
                 FROM restaurants, tile_bounds
                 WHERE ST_Intersects(restaurants.geom, tile_bounds.geom)
@@ -596,13 +596,30 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
         
         const result = await query(sqlQuery, [z, x, y]);
         
+        // Add coordinate conversion test
+        const featuresWithCoords = result.rows.map(row => {
+            const lat = parseFloat(row.lat);
+            const lon = parseFloat(row.lon);
+            const tileCoords = latLonToTileCoords(lat, lon, z, x, y);
+            return {
+                type: row.type,
+                city: row.city,
+                count: row.count,
+                lat: lat,
+                lon: lon,
+                tile_x: tileCoords.x.toFixed(4),
+                tile_y: tileCoords.y.toFixed(4),
+                in_bounds: tileCoords.x >= 0 && tileCoords.x <= 1 && tileCoords.y >= 0 && tileCoords.y <= 1
+            };
+        });
+        
         res.json({
             tile: `${z}/${x}/${y}`,
             tile_bounds: boundsResult.rows[0],
             mumbai_restaurants: mumbaiCount.rows[0].count,
             mumbai_sample: mumbaiSample.rows,
             features_found: result.rows.length,
-            sample_features: result.rows.slice(0, 3)
+            sample_features: featuresWithCoords
         });
     } catch (err) {
         res.status(500).json({ error: err.message, stack: err.stack });

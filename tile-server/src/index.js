@@ -276,15 +276,15 @@ function generateSimpleMVT(features) {
     const pbf = new Pbf();
     
     // Write layer
-    pbf.writeMessage(3, (pbf) => {
+    pbf.writeMessage(3, (layerPbf) => {
         // Layer name
-        pbf.writeStringField(1, 'restaurants');
+        layerPbf.writeStringField(1, 'restaurants');
         
         // Version
-        pbf.writeVarintField(15, 2);
+        layerPbf.writeVarintField(15, 2);
         
         // Extent
-        pbf.writeVarintField(5, 4096);
+        layerPbf.writeVarintField(5, 4096);
         
         // Collect all unique keys and values
         const keys = new Set();
@@ -305,31 +305,31 @@ function generateSimpleMVT(features) {
         
         // Write keys
         keysArray.forEach(key => {
-            pbf.writeStringField(3, key);
+            layerPbf.writeStringField(3, key);
         });
         
         // Write values
         valuesArray.forEach(value => {
-            pbf.writeMessage(4, (pbf) => {
+            layerPbf.writeMessage(4, (valuePbf) => {
                 if (typeof value === 'string') {
-                    pbf.writeStringField(1, value);
+                    valuePbf.writeStringField(1, value);
                 } else if (typeof value === 'number') {
                     if (Number.isInteger(value)) {
-                        pbf.writeVarintField(6, value);
+                        valuePbf.writeVarintField(6, value);
                     } else {
-                        pbf.writeDoubleField(3, value);
+                        valuePbf.writeDoubleField(3, value);
                     }
                 } else if (typeof value === 'boolean') {
-                    pbf.writeBooleanField(7, value);
+                    valuePbf.writeBooleanField(7, value);
                 }
             });
         });
         
         // Write features
         features.forEach((feature, idx) => {
-            pbf.writeMessage(2, (pbf) => {
+            layerPbf.writeMessage(2, (featurePbf) => {
                 // ID
-                pbf.writeVarintField(1, idx);
+                featurePbf.writeVarintField(1, idx);
                 
                 // Tags (property key-value pairs)
                 const tags = [];
@@ -337,10 +337,10 @@ function generateSimpleMVT(features) {
                     tags.push(keysArray.indexOf(key));
                     tags.push(valuesArray.indexOf(value));
                 });
-                pbf.writePackedVarint(2, tags);
+                featurePbf.writePackedVarint(2, tags);
                 
                 // Type (1 = point)
-                pbf.writeVarintField(3, 1);
+                featurePbf.writeVarintField(3, 1);
                 
                 // Geometry
                 const x = Math.round(feature.x * 4096);
@@ -352,7 +352,7 @@ function generateSimpleMVT(features) {
                     (y << 1) ^ (y >> 31)  // Zigzag encode y
                 ];
                 
-                pbf.writePackedVarint(4, geometry);
+                featurePbf.writePackedVarint(4, geometry);
             });
         });
     });

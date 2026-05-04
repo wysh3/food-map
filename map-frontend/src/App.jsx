@@ -202,39 +202,6 @@ function App() {
       map.current.getCanvas().style.cursor = '';
     });
 
-    // Performance monitoring
-    let frameCount = 0;
-    let lastTime = performance.now();
-
-    const measurePerformance = () => {
-      frameCount++;
-      const currentTime = performance.now();
-      
-      if (currentTime - lastTime >= 1000) {
-        const fps = Math.round(frameCount * 1000 / (currentTime - lastTime));
-        const tileCount = Object.keys(map.current.style.sourceCaches.restaurants?._tiles || {}).length;
-        
-        setPerformance({ fps, tileCount });
-        
-        frameCount = 0;
-        lastTime = currentTime;
-      }
-      
-      requestAnimationFrame(measurePerformance);
-    };
-
-    map.current.on('load', () => {
-      measurePerformance();
-    });
-
-    // Log tile loading
-    map.current.on('data', (e) => {
-      if (e.sourceId === 'restaurants' && e.isSourceLoaded) {
-        const tiles = map.current.style.sourceCaches.restaurants?._tiles || {};
-        console.log(`Loaded ${Object.keys(tiles).length} tiles`);
-      }
-    });
-
   }, []);
 
   const flyToCity = (cityKey) => {
@@ -300,14 +267,8 @@ function App() {
       <div className="performance-panel">
         <h3>⚡ Performance</h3>
         <div className="stat">
-          <span className="label">FPS:</span>
-          <span className={`value ${performance.fps < 30 ? 'warning' : ''}`}>
-            {performance.fps}
-          </span>
-        </div>
-        <div className="stat">
-          <span className="label">Tiles Loaded:</span>
-          <span className="value">{performance.tileCount}</span>
+          <span className="label">Status:</span>
+          <span className="value">Live</span>
         </div>
       </div>
 

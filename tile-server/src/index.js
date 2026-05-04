@@ -545,21 +545,56 @@ app.get('/api/debug/tile/:z/:x/:y', async (req, res) => {
             LIMIT 3
         `);
         
-        // Test actual tile query
-        const sqlQuery = `
-            WITH tile_bounds AS (
-                SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
-            )
-            SELECT 
-                'restaurant' AS type,
-                id, name, cuisine, rating, city,
-                NULL::integer AS count,
-                lat, lon,
-                ST_AsText(restaurants.geom) as geom_text
-            FROM restaurants, tile_bounds
-            WHERE ST_Intersects(restaurants.geom, tile_bounds.geom)
-            LIMIT 10;
-        `;
+        // Test actual tile query - use same logic as tile endpoint
+        let sqlQuery;
+        if (z <= 8) {
+            sqlQuery = `
+                WITH tile_bounds AS (
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
+                ),
+                city_clusters AS (
+                    SELECT 
+                        city,
+                        COUNT(*) as point_count,
+                        AVG(rating) as avg_rating,
+                        AVG(lat) as lat,
+                        AVG(lon) as lon,
+                        ST_Centroid(ST_Collect(geom)) as geom
+                    FROM restaurants
+                    WHERE is_active = true
+                    GROUP BY city
+                )
+                SELECT 
+                    'cluster' AS type,
+                    NULL::integer AS id,
+                    NULL AS name,
+                    NULL AS cuisine,
+                    city_clusters.avg_rating AS rating,
+                    city_clusters.city AS city,
+                    city_clusters.point_count AS count,
+                    city_clusters.lat AS lat,
+                    city_clusters.lon AS lon,
+                    ST_AsText(city_clusters.geom) as geom_text
+                FROM city_clusters, tile_bounds
+                WHERE ST_Intersects(city_clusters.geom, tile_bounds.geom)
+                LIMIT 10;
+            `;
+        } else {
+            sqlQuery = `
+                WITH tile_bounds AS (
+                    SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom
+                )
+                SELECT 
+                    'restaurant' AS type,
+                    id, name, cuisine, rating, city,
+                    NULL::integer AS count,
+                    lat, lon,
+                    ST_AsText(restaurants.geom) as geom_text
+                FROM restaurants, tile_bounds
+                WHERE ST_Intersects(restaurants.geom, tile_bounds.geom)
+                LIMIT 10;
+            `;
+        }
         
         const result = await query(sqlQuery, [z, x, y]);
         

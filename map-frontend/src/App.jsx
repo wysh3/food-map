@@ -305,7 +305,7 @@ function App() {
         </div>
         <div className="legend-item">
           <div className="legend-color" style={{ background: '#EF4444' }}></div>
-          <span>⭐ <3.0 (Below Average)</span>
+          <span>⭐ -3.0 (Below Average)</span>
         </div>
       </div>
 

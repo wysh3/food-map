@@ -152,7 +152,7 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                 WHERE ST_Intersects(restaurant_clusters_z12.geom, tile_bounds.geom)
                 LIMIT 5000;
             `;
-        } else if (z <= 13) {
+        } else if (z <= 11) {
             // Light dynamic clustering for medium zoom
             sqlQuery = `
                 WITH tile_bounds AS (

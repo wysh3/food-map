@@ -131,6 +131,7 @@ function App() {
                 'interpolate',
                 ['linear'],
                 ['zoom'],
+                12, 5,
                 13, 8,
                 16, 12,
                 18, 16
@@ -143,7 +144,7 @@ function App() {
                 4, '#10B981',  // Green for 4-4.5 stars
                 4.5, '#3B82F6'  // Blue for 4.5+ stars
               ],
-              'circle-opacity': 0.85,
+              'circle-opacity': 0.9,
               'circle-stroke-width': 2,
               'circle-stroke-color': '#ffffff'
             }

@@ -111,7 +111,6 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                     city_clusters.lon AS lon
                 FROM city_clusters, tile_bounds
                 WHERE ST_Intersects(city_clusters.geom, tile_bounds.geom)
-                   OR $1 <= 6
                 LIMIT 5000;
             `;
         } else if (z <= 10) {
@@ -242,12 +241,6 @@ app.get('/tiles/:z/:x/:y.mvt', async (req, res) => {
                             city: row.city || ''
                         }
                 };
-            })
-            .filter(feature => {
-                // Only include features within tile bounds (0-1 range)
-                // Allow small buffer for edge cases
-                return feature.x >= -0.1 && feature.x <= 1.1 && 
-                       feature.y >= -0.1 && feature.y <= 1.1;
             });
         
         // Generate MVT tile

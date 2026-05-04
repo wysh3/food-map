@@ -124,21 +124,6 @@ function App() {
               'circle-stroke-color': '#ffffff'
             }
           },
-          {
-            id: 'cluster-count',
-            type: 'symbol',
-            source: 'restaurants',
-            'source-layer': 'restaurants',
-            filter: ['==', ['get', 'type'], 'cluster'],
-            layout: {
-              'text-field': ['get', 'point_count'],
-              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-              'text-size': 12
-            },
-            paint: {
-              'text-color': '#ffffff'
-            }
-          },
 
           {
             id: 'restaurant-points',
